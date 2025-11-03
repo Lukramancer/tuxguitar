@@ -1,9 +1,6 @@
 package app.tuxguitar.app.tools.custom.tuner;
 
-import javax.sound.sampled.AudioFormat;
-import javax.sound.sampled.AudioSystem;
-import javax.sound.sampled.DataLine;
-import javax.sound.sampled.TargetDataLine;
+import javax.sound.sampled.*;
 
 import app.tuxguitar.app.TuxGuitar;
 import app.tuxguitar.util.error.TGErrorManager;
@@ -17,6 +14,7 @@ public class TGTunerSettings {
 	protected int sampleSize;
 	protected float sampleRate;
 	protected String deviceName;
+	protected Mixer mixer;
 	protected double threshold;
 	protected int bufferSize;
 	protected int fftSize;
@@ -32,6 +30,7 @@ public class TGTunerSettings {
 		TGTunerSettings retValue = new TGTunerSettings();
 		retValue.setSampleRate(11025);
 		retValue.setSampleSize(8);
+		retValue.setMixer(null);
 		retValue.setBufferSize(DEFAULT_BUFFER_SIZE);
 		retValue.setFFTSize(DEFAULT_FFT_SIZE);
 		retValue.setThreshold(0.03);
@@ -50,8 +49,7 @@ public class TGTunerSettings {
 			DataLine.Info info = settings.getDataLineInfo();
 
 			try {
-
-				targetDataLine = (TargetDataLine)AudioSystem.getLine(info);
+				targetDataLine = (TargetDataLine)(settings.mixer != null ? settings.mixer.getLine(info) : AudioSystem.getLine(info));
 
 			} catch (Exception ex) {
 				TGErrorManager.getInstance(TuxGuitar.getInstance().getContext()).handleError(ex);
@@ -118,6 +116,18 @@ public class TGTunerSettings {
 
 	public void setThreshold(double nt) {
 		this.threshold = nt;
+	}
+
+	public void setMixer(Mixer mixer) {
+		this.mixer = mixer;
+	}
+	public Mixer getMixer() {
+		return this.mixer;
+	}
+
+	public Mixer.Info getMixerInfo() {
+		Mixer mixer = this.getMixer();
+		return mixer != null ? mixer.getMixerInfo() : null;
 	}
 
 	public void setSampleRate(float sampleRate) {

@@ -18,6 +18,10 @@ import app.tuxguitar.ui.widget.UITextArea;
 import app.tuxguitar.ui.widget.UIWindow;
 import app.tuxguitar.util.TGContext;
 
+import javax.sound.sampled.AudioSystem;
+import javax.sound.sampled.Line;
+import javax.sound.sampled.Mixer;
+
 /**
  * @author Nikola Kolarovic <nikola.kolarovic at gmail.com>
  *
@@ -25,6 +29,7 @@ import app.tuxguitar.util.TGContext;
 public class TGTunerSettingsDialog {
 
 	private TGTunerDialog tunerDialog = null;
+	private UIDropDownSelect<Mixer.Info> deviceCombo = null;
 	private UIDropDownSelect<Float> sampleRateCombo = null;
 	private UIDropDownSelect<Integer> sampleSizeCombo = null;
 	private UIDropDownSelect<Integer> bufferSizeCombo = null;
@@ -49,11 +54,26 @@ public class TGTunerSettingsDialog {
 		dialog.setText(TuxGuitar.getProperty("tuner.settings"));
 
 		// ---------------------------------------------------------------------------
+		UITableLayout inputDeviceLayout = new UITableLayout();
+		UILegendPanel inputDeviceComposite = uiFactory.createLegendPanel(dialog);
+		inputDeviceComposite.setLayout(inputDeviceLayout);
+		inputDeviceComposite.setText("Device");
+		dialogLayout.set(inputDeviceComposite, 1, 1, UITableLayout.ALIGN_FILL, UITableLayout.ALIGN_FILL, true, true);
+		this.deviceCombo = uiFactory.createDropDownSelect(inputDeviceComposite);
+		this.deviceCombo.addItem(new UISelectItem<Mixer.Info>("Default", null));
+		Mixer.Info[] mixerInfo = AudioSystem.getMixerInfo();
+		for (Mixer.Info info : mixerInfo) {
+			this.deviceCombo.addItem(new UISelectItem<Mixer.Info>(info.getDescription(), info));
+		}
+		this.deviceCombo.addSelectionListener(new UpdatedListener());
+		inputDeviceLayout.set(this.deviceCombo, 1, 1, UITableLayout.ALIGN_FILL, UITableLayout.ALIGN_CENTER, true, false);
+
+
 		UITableLayout sampleLayout = new UITableLayout();
 		UILegendPanel sampleComposite = uiFactory.createLegendPanel(dialog);
 		sampleComposite.setLayout(sampleLayout);
 		sampleComposite.setText(TuxGuitar.getProperty("tuner.sound-format"));
-		dialogLayout.set(sampleComposite, 1, 1, UITableLayout.ALIGN_FILL, UITableLayout.ALIGN_FILL, true, true);
+		dialogLayout.set(sampleComposite, 2, 1, UITableLayout.ALIGN_FILL, UITableLayout.ALIGN_FILL, true, true);
 
 		UILabel sampleRateLabel = uiFactory.createLabel(sampleComposite);
 		sampleRateLabel.setText(TuxGuitar.getProperty("tuner.sample-rate") + ":");
@@ -83,7 +103,7 @@ public class TGTunerSettingsDialog {
 		UILegendPanel analyzeComposite = uiFactory.createLegendPanel(dialog);
 		analyzeComposite.setLayout(analyzeLayout);
 		analyzeComposite.setText(TuxGuitar.getProperty("tuner.sampling-and-analyze"));
-		dialogLayout.set(analyzeComposite, 2, 1, UITableLayout.ALIGN_FILL, UITableLayout.ALIGN_FILL, true, true);
+		dialogLayout.set(analyzeComposite, 3, 1, UITableLayout.ALIGN_FILL, UITableLayout.ALIGN_FILL, true, true);
 
 		// buffer size
 		UILabel bufferSizeLabel = uiFactory.createLabel(analyzeComposite);
@@ -120,7 +140,7 @@ public class TGTunerSettingsDialog {
 		final UILegendPanel noiseGateComposite = uiFactory.createLegendPanel(dialog);
 		noiseGateComposite.setLayout(noiseGateLayout);
 		noiseGateComposite.setText(TuxGuitar.getProperty("tuner.noise-gate"));
-		dialogLayout.set(noiseGateComposite, 3, 1, UITableLayout.ALIGN_FILL, UITableLayout.ALIGN_FILL, true, true);
+		dialogLayout.set(noiseGateComposite, 4, 1, UITableLayout.ALIGN_FILL, UITableLayout.ALIGN_FILL, true, true);
 
 		this.noiseGate = uiFactory.createHorizontalScale(noiseGateComposite);
 		this.noiseGate.setMaximum(100);
@@ -143,7 +163,7 @@ public class TGTunerSettingsDialog {
 		UILegendPanel infoComposite = uiFactory.createLegendPanel(dialog);
 		infoComposite.setLayout(infoLayout);
 		infoComposite.setText(TuxGuitar.getProperty("tuner.info"));
-		dialogLayout.set(infoComposite, 4, 1, UITableLayout.ALIGN_FILL, UITableLayout.ALIGN_FILL, true, true);
+		dialogLayout.set(infoComposite, 5, 1, UITableLayout.ALIGN_FILL, UITableLayout.ALIGN_FILL, true, true);
 
 		this.settingsInfo = uiFactory.createTextArea(infoComposite, true, false);
 		infoLayout.set(this.settingsInfo, 1, 1, UITableLayout.ALIGN_FILL, UITableLayout.ALIGN_FILL, true, true, 1, 1, 400f, 100f, null);
@@ -152,7 +172,7 @@ public class TGTunerSettingsDialog {
 		UITableLayout buttonsLayout = new UITableLayout(0f);
 		UIPanel buttons = uiFactory.createPanel(dialog, false);
 		buttons.setLayout(buttonsLayout);
-		dialogLayout.set(buttons, 5, 1, UITableLayout.ALIGN_RIGHT, UITableLayout.ALIGN_FILL, true, true);
+		dialogLayout.set(buttons, 6, 1, UITableLayout.ALIGN_RIGHT, UITableLayout.ALIGN_FILL, true, true);
 
 		UIButton buttonOK = uiFactory.createButton(buttons);
 		buttonOK.setText(TuxGuitar.getProperty("ok"));
@@ -187,6 +207,8 @@ public class TGTunerSettingsDialog {
 		}
 
 		try {
+			this.deviceCombo.setSelectedValue(settings.getMixerInfo());
+
 			this.sampleRateCombo.setSelectedValue(settings.getSampleRate());
 			this.sampleSizeCombo.setSelectedValue(settings.getSampleSize());
 
@@ -208,6 +230,9 @@ public class TGTunerSettingsDialog {
 		try {
 			if (this.updated & saveWanted) {
 				TGTunerSettings settings = new TGTunerSettings();
+
+				settings.setMixer(this.getMixer());
+
 				settings.setSampleRate(this.getSampleRate());
 				settings.setSampleSize(this.getSampleSize());
 
@@ -227,6 +252,13 @@ public class TGTunerSettingsDialog {
 			ex.printStackTrace();
 			TGMessageDialogUtil.errorMessage(getContext(), dialog, ex.getMessage());
 		}
+	}
+
+	private Mixer.Info getMixerInfo() {
+		return this.deviceCombo.getSelectedValue();
+	}
+	private Mixer getMixer() {
+		return AudioSystem.getMixer(this.getMixerInfo());
 	}
 
 	private float getSampleRate() {
